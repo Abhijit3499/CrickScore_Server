@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+     <style>
+        .ball {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #000;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin: 5px;
+        }
+        .out { background-color: red; }
+        .run-0 { background-color: white; }
+        .run-1 { background-color: grey; }
+        .run-2 { background-color: lightgrey; }
+        .run-3 { background-color: lightgrey; }
+        .run-4 { background-color: lightblue; }
+        .run-6 { background-color: teal; }
+    </style>
+    <script>
+        var stompClient = null;
+        var over = [];
+
+        function connect() {
+            var socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                
+                stompClient.subscribe('/topic/scoreUpdate', function (message) {
+                    showCurrentState(JSON.parse(message.body));
+                });
+                
+                stompClient.subscribe('/topic/runs', function (message) {
+                    showCurrentState(JSON.parse(message.body));
+                });
+            });
+        }
+
+        function showCurrentState(state) {
+            document.getElementById('current-score').innerText = `${state.currentRuns}/${state.currentWickets}`;
+            document.getElementById('current-ball').innerText = `(${state.currentOver}.${state.currentBall})`;
+            updateOverDetails(state);
+        }
+         function showRuns(state) {
+            document.getElementById('this-over-run-scored').innerText = `${state.runsScored}`;
+            
+        }
+        function updateOverDetails(state) {
+            over.push(state.currentBallRun);
+            updateOverDisplay();
+
+            if (over.length >= 6) {
+                setTimeout(() => {
+                    over = [];
+                    updateOverDisplay();
+                }, 2000); 
+            }
+        }
+        function updateOverDisplay() {
+            const overList = document.getElementById('over-list');
+            overList.innerHTML = ''; 
+
+            over.forEach((ball, index) => {
+                const ballItem = document.createElement('li');
+                ballItem.className = 'ball';
+                console.log(ball);
+
+                if (ball === 9) {
+                    ballItem.classList.add('out');
+                    ballItem.innerText = 'Out';
+                } else {
+                    ballItem.classList.add(`run-${ball}`);
+                    ballItem.innerText = ball;
+                }
+
+                overList.appendChild(ballItem);
+            });
+        }
+        window.onload = function() {
+            connect();
+            fetch('/api/current-state')
+                .then(response => response.json())
+                .then(data => {
+                    showCurrentState(data);
+                    });
+             fetch('/api/runs')
+                .then(response => response.json())
+                .then(data => {
+                    showRuns(data);       
+                    // Populate other sections...
+                      
+        });
+        };
+        
+    </script>
+</head>
+<body>
+    <h2 style="text-align: center;"><div id="admin-header"><span id="current-score"></span></div></h2>      
+    <h3 style="text-align: center;"><div id="over">Over <span id ="current-ball"></span></div></h3>
+    <div id="animation-section"></div>
+    <div style="text-align: center;" id="over-details">
+        <ul id="over-list"></ul>
+    </div>
+</body>
+</html>

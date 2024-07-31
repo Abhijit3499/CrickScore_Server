@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script>
+        var stompClient = null;
+
+        function connect() {
+            var socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/scoreUpdate', function (message) {
+                    showCurrentState(JSON.parse(message.body));
+                });
+            });
+        }
+
+        function showCurrentState(state) {
+            document.getElementById('current-score').innerText = `${state.currentRuns}/${state.currentWickets}`;
+            // Update other sections...
+        }
+
+        window.onload = function() {
+            connect();
+            fetch('/api/current-state')
+                .then(response => response.json())
+                .then(data => {
+                    showCurrentState(data);
+                    // Populate other sections...
+                });
+        };
+    </script>
+</head>
+<body>
+    <div id="user-header">Current Score: <span id="current-score"></span></div>
+    <div id="animation-section"></div>
+    <div id="this-over-run-scored"></div>
+</body>
+</html>

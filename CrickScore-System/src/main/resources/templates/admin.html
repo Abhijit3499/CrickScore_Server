@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+		
+		.current-score{
+			
+		}
+        .ball {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #000;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin: 5px;
+        }
+        .out { background-color: red; }
+        .run-0 { background-color: white; }
+        .run-1 { background-color: grey; }
+        .run-2 { background-color: lightgrey; }
+        .run-3 { background-color: lightgrey; }
+        .run-4 { background-color: lightblue; }
+        .run-6 { background-color: teal; }
+    </style>
+    <script>
+        var stompClient = null;
+        var currentOver = [];
+        var overHistory = [];
+
+        function connect() {
+            var socket = new SockJS('http://localhost:8080/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/scoreUpdate', function (message) {
+                    showCurrentState(JSON.parse(message.body));
+                });
+                
+            });
+        }
+       
+        function showCurrentState(state) {
+			
+			if(state.currentWickets==10){
+				console.log(state.currentWickets);
+				console.log("in");
+			document.getElementById('current-score').innerText = 'Game Over';}
+			
+            document.getElementById('current-score').innerText = `${state.currentRuns}/${state.currentWickets}`;
+            document.getElementById('current-ball').innerText = `(${state.currentOver}.${state.currentBall})`;
+            updateOverDetails(state);
+        }
+        function updateOverDetails(state) {
+            if (state.currentBallRun === 9) {
+                currentOver.push('Out');
+            } else {
+                currentOver.push(state.currentBallRun);
+            }
+            updateOverDisplay();
+
+           if (currentOver.length >= 6) {
+                overHistory.push([...currentOver]); // Save current over to history
+                currentOver = [];
+                setTimeout(() => {
+                    updateOverDisplay();
+                    updateOverHistory();
+                }, 2000); 
+            }
+        }
+        function updateOverDisplay() {
+            const overList = document.getElementById('over-list');
+            overList.innerHTML = ''; 
+
+            currentOver.forEach((ball, index) => {
+                const ballItem = document.createElement('li');
+                ballItem.className = 'ball';
+                console.log(ball);
+
+                if (ball === 9) {
+                    ballItem.classList.add('out');
+                    ballItem.innerText = 'Out';
+                } else {
+                    ballItem.classList.add(`run-${ball}`);
+                    ballItem.innerText = ball;
+                }
+
+                overList.appendChild(ballItem);
+            });
+        }
+        function updateOverHistory() {
+            const overHistoryList = document.getElementById('over-history-list');
+            overHistoryList.innerHTML = ''; // Clear previous display
+
+            overHistory.forEach((over, index) => {
+                const overItem = document.createElement('div');
+                overItem.className = 'over-item';
+                overItem.innerText = `Over ${index + 1}: `;
+
+                over.forEach((ball, ballIndex) => {
+                    const ballSpan = document.createElement('span');
+                    ballSpan.className = 'ball';
+
+                    if (ball === 'Out') {
+                        ballSpan.classList.add('out');
+                        ballSpan.innerText = 'Out';
+                    } else {
+                        ballSpan.classList.add(`run-${ball}`);
+                        ballSpan.innerText = ball;
+                    }
+
+                    overItem.appendChild(ballSpan);
+                });
+
+                overHistoryList.appendChild(overItem);
+            });
+        }
+        
+       function updateScore(runs) {
+        fetch('http://localhost:8080/api/update-score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ runsScored: runs })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Score updated:', data);
+    })
+    .catch((error) => {
+        console.error('Error updating score:', error);
+    });
+}
+
+        window.onload = function() {
+            connect();
+            fetch('/api/current-state')
+                .then(response => response.json())
+                .then(data => {
+                    showCurrentState(data);
+                    // Populate other sections...
+                });
+        };
+    </script>
+</head>
+<body>
+    <h2 style="text-align: center;"><div id="admin-header"><span id="current-score"></span></div></h2>
+    <h3 style="text-align: center;"><div id="over">Over <span id ="current-ball"></span></div></h3>
+    
+    <div style="text-align: center;" id="over-details">
+        
+        <ul id="over-list"></ul>
+    </div>
+    
+    <div style="text-align:center;" id="this-over-control">
+        <button style="background-color: white;border: 1px solid #000;" onclick="updateScore(0)">0</button>
+        <button style="background-color :gray ;border: 1px solid #000;" onclick="updateScore(1)">1</button>
+        <button style="background-color: lightgray;border: 1px solid #000;" onclick="updateScore(2)">2</button>
+        <button style="background-color: lightgray;border: 1px solid #000;" onclick="updateScore(3)">3</button>
+        <button style="background-color: lightblue;border: 1px solid #000;" onclick="updateScore(4)">4</button>
+        <button style="background-color: teal;border: 1px solid #000;" onclick="updateScore(6)">6</button>
+        <button style="background-color: red;border: 1px solid #000;" onclick="updateScore(9)">Out</button>
+    </div>
+    <div id="over-history" class="over-history">
+        <h3 style="text-align: center;">Over Listings</h3>
+        <div id="over-history-list"></div>
+    </div>
+</body>
+</html>
